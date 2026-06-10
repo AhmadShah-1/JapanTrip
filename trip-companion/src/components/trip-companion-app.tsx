@@ -221,22 +221,27 @@ export function TripCompanionApp({
 
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(emptyExpenseDraft);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseEditorOpen, setExpenseEditorOpen] = useState(false);
 
   const [activityDraft, setActivityDraft] = useState<ActivityDraft>(
     emptyActivityDraft(data.tripDays[0]?.id ?? ""),
   );
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [activityEditorOpen, setActivityEditorOpen] = useState(false);
 
   const [bookingDraft, setBookingDraft] = useState<BookingDraft>(emptyBookingDraft);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [bookingEditorOpen, setBookingEditorOpen] = useState(false);
 
   const [guideDraft, setGuideDraft] = useState<GuideDraft>(emptyGuideDraft);
   const [editingGuideId, setEditingGuideId] = useState<string | null>(null);
+  const [guideEditorOpen, setGuideEditorOpen] = useState(false);
 
   const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft>(
     emptyChecklistDraft,
   );
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [checklistEditorOpen, setChecklistEditorOpen] = useState(false);
 
   const [calendarCity, setCalendarCity] = useState("All");
   const [calendarTag, setCalendarTag] = useState("All");
@@ -406,6 +411,10 @@ export function TripCompanionApp({
     });
   }
 
+  function confirmDangerousAction(message: string): boolean {
+    return window.confirm(message);
+  }
+
   function handleExpenseSubmit() {
     const payload = {
       name: expenseDraft.name,
@@ -434,6 +443,7 @@ export function TripCompanionApp({
       () => {
         setExpenseDraft(emptyExpenseDraft());
         setEditingExpenseId(null);
+        setExpenseEditorOpen(false);
       },
     );
   }
@@ -479,6 +489,7 @@ export function TripCompanionApp({
       () => {
         setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
         setEditingActivityId(null);
+        setActivityEditorOpen(false);
       },
     );
   }
@@ -506,6 +517,7 @@ export function TripCompanionApp({
       () => {
         setBookingDraft(emptyBookingDraft());
         setEditingBookingId(null);
+        setBookingEditorOpen(false);
       },
     );
   }
@@ -527,6 +539,7 @@ export function TripCompanionApp({
       () => {
         setGuideDraft(emptyGuideDraft());
         setEditingGuideId(null);
+        setGuideEditorOpen(false);
       },
     );
   }
@@ -552,6 +565,7 @@ export function TripCompanionApp({
       () => {
         setChecklistDraft(emptyChecklistDraft());
         setEditingChecklistId(null);
+        setChecklistEditorOpen(false);
       },
     );
   }
@@ -584,9 +598,16 @@ export function TripCompanionApp({
         {data.persistenceMode === "database" ? (
           <button
             className="ghost-button"
-            onClick={() =>
-              runMutation(() => resetData(), "Database reset from seed.")
-            }
+            onClick={() => {
+              if (
+                !confirmDangerousAction(
+                  "Re-seed the database from the original notes? This will overwrite live edits.",
+                )
+              ) {
+                return;
+              }
+              runMutation(() => resetData(), "Database reset from seed.");
+            }}
             disabled={isPending}
             type="button"
           >
@@ -708,12 +729,19 @@ export function TripCompanionApp({
                 onClick={() => {
                   setEditingActivityId(null);
                   setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
+                  setActivityEditorOpen(true);
                 }}
               >
                 Add new activity
               </button>
             </div>
-            <details className="editor-panel">
+            <details
+              className="editor-panel"
+              open={activityEditorOpen}
+              onToggle={(event) =>
+                setActivityEditorOpen(event.currentTarget.open)
+              }
+            >
               <summary>Activity editor</summary>
               <div className="editor-body">
                 <div className="form-grid">
@@ -794,6 +822,7 @@ export function TripCompanionApp({
                     onClick={() => {
                       setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
                       setEditingActivityId(null);
+                      setActivityEditorOpen(false);
                     }}
                     type="button"
                   >
@@ -923,6 +952,7 @@ export function TripCompanionApp({
                                                   activity.bookingNeeded,
                                                 priority: String(activity.priority),
                                               });
+                                              setActivityEditorOpen(true);
                                             }}
                                           >
                                             Edit
@@ -930,7 +960,14 @@ export function TripCompanionApp({
                                           <button
                                             className="small-button danger"
                                             type="button"
-                                            onClick={() =>
+                                            onClick={() => {
+                                              if (
+                                                !confirmDangerousAction(
+                                                  `Delete activity "${activity.title}"?`,
+                                                )
+                                              ) {
+                                                return;
+                                              }
                                               runMutation(
                                                 () =>
                                                   mutateData("DELETE", {
@@ -939,8 +976,8 @@ export function TripCompanionApp({
                                                     record: {},
                                                   }),
                                                 "Activity deleted.",
-                                              )
-                                            }
+                                              );
+                                            }}
                                           >
                                             Delete
                                           </button>
@@ -971,12 +1008,19 @@ export function TripCompanionApp({
                 onClick={() => {
                   setEditingExpenseId(null);
                   setExpenseDraft(emptyExpenseDraft());
+                  setExpenseEditorOpen(true);
                 }}
               >
                 Add new expense
               </button>
             </div>
-            <details className="editor-panel">
+            <details
+              className="editor-panel"
+              open={expenseEditorOpen}
+              onToggle={(event) =>
+                setExpenseEditorOpen(event.currentTarget.open)
+              }
+            >
               <summary>Expense editor</summary>
               <div className="editor-body">
                 <div className="form-grid">
@@ -1085,6 +1129,7 @@ export function TripCompanionApp({
                     onClick={() => {
                       setExpenseDraft(emptyExpenseDraft());
                       setEditingExpenseId(null);
+                      setExpenseEditorOpen(false);
                     }}
                   >
                     Clear
@@ -1180,7 +1225,7 @@ export function TripCompanionApp({
                                 type="button"
                                 onClick={() => {
                                   setEditingExpenseId(expense.id);
-                                  setExpenseDraft({
+                                setExpenseDraft({
                                     name: expense.name,
                                     amount: String(expense.amount),
                                     currency: expense.currency,
@@ -1189,29 +1234,37 @@ export function TripCompanionApp({
                                     notes: expense.notes,
                                     date: expense.date,
                                     status: expense.status,
-                                    sourceUrl: expense.sourceUrl ?? "",
-                                  });
-                                }}
-                              >
-                                Edit
+                                  sourceUrl: expense.sourceUrl ?? "",
+                                });
+                                setExpenseEditorOpen(true);
+                              }}
+                            >
+                              Edit
                               </button>
                               <button
                                 className="small-button danger"
                                 type="button"
-                                onClick={() =>
-                                  runMutation(
-                                    () =>
-                                      mutateData("DELETE", {
-                                        entity: "expenses",
-                                        id: expense.id,
-                                        record: {},
-                                      }),
-                                    "Expense deleted.",
+                              onClick={() => {
+                                if (
+                                  !confirmDangerousAction(
+                                    `Delete expense "${expense.name}"?`,
                                   )
+                                ) {
+                                  return;
                                 }
-                              >
-                                Delete
-                              </button>
+                                runMutation(
+                                  () =>
+                                    mutateData("DELETE", {
+                                      entity: "expenses",
+                                      id: expense.id,
+                                      record: {},
+                                    }),
+                                  "Expense deleted.",
+                                );
+                              }}
+                            >
+                              Delete
+                            </button>
                             </>
                           }
                           expandedContent={
@@ -1287,12 +1340,19 @@ export function TripCompanionApp({
                 onClick={() => {
                   setEditingBookingId(null);
                   setBookingDraft(emptyBookingDraft());
+                  setBookingEditorOpen(true);
                 }}
               >
                 Add new booking
               </button>
             </div>
-            <details className="editor-panel">
+            <details
+              className="editor-panel"
+              open={bookingEditorOpen}
+              onToggle={(event) =>
+                setBookingEditorOpen(event.currentTarget.open)
+              }
+            >
               <summary>Booking editor</summary>
               <div className="editor-body">
                 <div className="form-grid">
@@ -1375,6 +1435,7 @@ export function TripCompanionApp({
                     onClick={() => {
                       setBookingDraft(emptyBookingDraft());
                       setEditingBookingId(null);
+                      setBookingEditorOpen(false);
                     }}
                   >
                     Clear
@@ -1442,6 +1503,7 @@ export function TripCompanionApp({
                                     notes: booking.notes,
                                     sourceUrl: booking.sourceUrl ?? "",
                                   });
+                                  setBookingEditorOpen(true);
                                 }}
                               >
                                 Edit
@@ -1449,20 +1511,27 @@ export function TripCompanionApp({
                               <button
                                 className="small-button danger"
                                 type="button"
-                                onClick={() =>
-                                  runMutation(
-                                    () =>
-                                      mutateData("DELETE", {
-                                        entity: "bookings",
-                                        id: booking.id,
-                                        record: {},
-                                      }),
-                                    "Booking deleted.",
+                              onClick={() => {
+                                if (
+                                  !confirmDangerousAction(
+                                    `Delete booking "${booking.title}"?`,
                                   )
+                                ) {
+                                  return;
                                 }
-                              >
-                                Delete
-                              </button>
+                                runMutation(
+                                  () =>
+                                    mutateData("DELETE", {
+                                      entity: "bookings",
+                                      id: booking.id,
+                                      record: {},
+                                    }),
+                                  "Booking deleted.",
+                                );
+                              }}
+                            >
+                              Delete
+                            </button>
                             </>
                           }
                           expandedContent={
@@ -1495,12 +1564,17 @@ export function TripCompanionApp({
                 onClick={() => {
                   setEditingGuideId(null);
                   setGuideDraft(emptyGuideDraft());
+                  setGuideEditorOpen(true);
                 }}
               >
                 Add new guidance item
               </button>
             </div>
-            <details className="editor-panel">
+            <details
+              className="editor-panel"
+              open={guideEditorOpen}
+              onToggle={(event) => setGuideEditorOpen(event.currentTarget.open)}
+            >
               <summary>Guidance editor</summary>
               <div className="editor-body">
                 <div className="form-grid">
@@ -1571,6 +1645,7 @@ export function TripCompanionApp({
                     onClick={() => {
                       setGuideDraft(emptyGuideDraft());
                       setEditingGuideId(null);
+                      setGuideEditorOpen(false);
                     }}
                   >
                     Clear
@@ -1617,6 +1692,7 @@ export function TripCompanionApp({
                                   leaveBy: guide.leaveBy,
                                   linkedDate: guide.linkedDate,
                                 });
+                                setGuideEditorOpen(true);
                               }}
                             >
                               Edit
@@ -1624,7 +1700,14 @@ export function TripCompanionApp({
                             <button
                               className="small-button danger"
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                if (
+                                  !confirmDangerousAction(
+                                    `Delete guidance "${guide.title}"?`,
+                                  )
+                                ) {
+                                  return;
+                                }
                                 runMutation(
                                   () =>
                                     mutateData("DELETE", {
@@ -1633,8 +1716,8 @@ export function TripCompanionApp({
                                       record: {},
                                     }),
                                   "Guide deleted.",
-                                )
-                              }
+                                );
+                              }}
                             >
                               Delete
                             </button>
@@ -1664,12 +1747,19 @@ export function TripCompanionApp({
                 onClick={() => {
                   setEditingChecklistId(null);
                   setChecklistDraft(emptyChecklistDraft());
+                  setChecklistEditorOpen(true);
                 }}
               >
                 Add new checklist item
               </button>
             </div>
-            <details className="editor-panel">
+            <details
+              className="editor-panel"
+              open={checklistEditorOpen}
+              onToggle={(event) =>
+                setChecklistEditorOpen(event.currentTarget.open)
+              }
+            >
               <summary>Checklist editor</summary>
               <div className="editor-body">
                 <div className="form-grid">
@@ -1736,6 +1826,7 @@ export function TripCompanionApp({
                     onClick={() => {
                       setChecklistDraft(emptyChecklistDraft());
                       setEditingChecklistId(null);
+                      setChecklistEditorOpen(false);
                     }}
                   >
                     Clear
@@ -1789,6 +1880,7 @@ export function TripCompanionApp({
                                       item.estimatedCost?.toString() ?? "",
                                     currency: item.currency ?? "",
                                   });
+                                  setChecklistEditorOpen(true);
                                 }}
                               >
                                 Edit
@@ -1796,20 +1888,27 @@ export function TripCompanionApp({
                               <button
                                 className="small-button danger"
                                 type="button"
-                                onClick={() =>
-                                  runMutation(
-                                    () =>
-                                      mutateData("DELETE", {
-                                        entity: "checklist",
-                                        id: item.id,
-                                        record: {},
-                                      }),
-                                    "Checklist item deleted.",
+                              onClick={() => {
+                                if (
+                                  !confirmDangerousAction(
+                                    `Delete checklist item "${item.label}"?`,
                                   )
+                                ) {
+                                  return;
                                 }
-                              >
-                                Delete
-                              </button>
+                                runMutation(
+                                  () =>
+                                    mutateData("DELETE", {
+                                      entity: "checklist",
+                                      id: item.id,
+                                      record: {},
+                                    }),
+                                  "Checklist item deleted.",
+                                );
+                              }}
+                            >
+                              Delete
+                            </button>
                             </>
                           }
                           expandedContent={
