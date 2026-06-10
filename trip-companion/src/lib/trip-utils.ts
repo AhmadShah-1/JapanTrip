@@ -1,4 +1,4 @@
- import { parse, format, isValid } from "date-fns";
+import { format, isValid, parse } from "date-fns";
 
 import type {
   Activity,
@@ -23,26 +23,74 @@ const MONTHS: Record<string, string> = {
   Dec: "12",
 };
 
-export function repairText(input: string): string {
-  const trimmed = input.replace(/\u0000/g, "");
-  const repaired = Buffer.from(trimmed, "latin1").toString("utf8");
-  const candidate = repaired.includes("Tokyo") || repaired.includes("Kyoto");
-  return normalizeWhitespace(candidate ? repaired : trimmed);
+export function normalizeWhitespace(input: string): string {
+  return input.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function normalizeWhitespace(input: string): string {
-  return input.replace(/\s+/g, " ").replace(/\u00a0/g, " ").trim();
+export function cleanText(input: string): string {
+  return normalizeWhitespace(
+    input
+      .replace(/\u0000/g, "")
+      .replace(/Ã‚Â¥|Â¥/g, "¥")
+      .replace(/Ã¢â€šÂ©|â‚©/g, "₩")
+      .replace(/Ã‚Â·|Â·/g, " · ")
+      .replace(/Ã¢â€ â€™|â†’/g, " -> ")
+      .replace(/Ã¢â‚¬â€œ|Ã¢â‚¬â€|â€“|â€”/g, " - ")
+      .replace(/Ã¢â‚¬Ëœ|Ã¢â‚¬â„¢|â€˜|â€™/g, "'")
+      .replace(/Ã¢â‚¬Å“|Ã¢â‚¬ï¿½|â€œ|â€�/g, '"')
+      .replace(/Ã¢Å“Ë†Ã¯Â¸Â|Ã¢Å“Ë†/g, "Flight")
+      .replace(/Ã°Å¸ÂÂ¨/g, "Hotel")
+      .replace(/Ã°Å¸â€¡Â¯Ã°Å¸â€¡Âµ/g, "Japan")
+      .replace(/Ã°Å¸â€¡Â°Ã°Å¸â€¡Â·/g, "Korea")
+      .replace(/Ã°Å¸â€œÂ¸/g, "Photo")
+      .replace(/Ã°Å¸â€ºÂµ/g, "Scooter")
+      .replace(/Ã°Å¸Å¡â€”/g, "Car")
+      .replace(/Ã°Å¸Å’Å /g, "Busan")
+      .replace(/Ã¢Â­Â/g, "Star")
+      .replace(/Ã‚|Â/g, "")
+      .replace(/\s*->\s*/g, " -> ")
+      .replace(/\s*·\s*/g, " · "),
+  );
+}
+
+export function repairText(input: string): string {
+  const trimmed = input.replace(/\u0000/g, "");
+
+  try {
+    if (typeof Buffer === "undefined") {
+      return cleanText(trimmed);
+    }
+
+    const repaired = Buffer.from(trimmed, "latin1").toString("utf8");
+    const candidate =
+      repaired.includes("Tokyo") ||
+      repaired.includes("Kyoto") ||
+      repaired.includes("Seoul") ||
+      repaired.includes("Busan");
+    return cleanText(candidate ? repaired : trimmed);
+  } catch {
+    return cleanText(trimmed);
+  }
+}
+
+export function toSearchText(input: string): string {
+  return cleanText(input)
+    .toLowerCase()
+    .replace(/[¥₩$]/g, " ")
+    .replace(/[^a-z0-9\s-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function slugify(input: string): string {
-  return normalizeWhitespace(input)
+  return cleanText(input)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
 export function toIsoDate(shortDate: string, year = 2026): string {
-  const cleaned = normalizeWhitespace(shortDate).replace(".", "");
+  const cleaned = cleanText(shortDate).replace(".", "");
   const [monthRaw, dayRaw] = cleaned.split(" ");
   const month = MONTHS[monthRaw] ?? "01";
   const day = dayRaw.padStart(2, "0");
@@ -50,7 +98,7 @@ export function toIsoDate(shortDate: string, year = 2026): string {
 }
 
 export function toIsoDateTime(date: string, label: string): string {
-  const normalized = normalizeWhitespace(label);
+  const normalized = cleanText(label);
   const parsed = parse(normalized, "h:mm a", new Date(`${date}T00:00:00`));
   if (!isValid(parsed)) {
     return `${date}T12:00:00`;
@@ -59,14 +107,14 @@ export function toIsoDateTime(date: string, label: string): string {
 }
 
 export function parseTags(input: string): string[] {
-  return input
-    .split(",")
-    .map((part) => normalizeWhitespace(part))
+  return cleanText(input)
+    .split(/[,|·•/]+/)
+    .map((part) => cleanText(part))
     .filter(Boolean);
 }
 
 export function joinTags(tags: string[]): string {
-  return tags.map((tag) => normalizeWhitespace(tag)).filter(Boolean).join(", ");
+  return tags.map((tag) => cleanText(tag)).filter(Boolean).join(", ");
 }
 
 export function getRate(
@@ -183,7 +231,11 @@ export function inferCategory(title: string, tags: string[]): string {
 export function inferGuideKind(title: string): GuideKind {
   const lower = title.toLowerCase();
   if (lower.includes("airport") || lower.includes("flight")) return "airport";
-  if (lower.includes("station") || lower.includes("shinkansen") || lower.includes("ktx")) {
+  if (
+    lower.includes("station") ||
+    lower.includes("shinkansen") ||
+    lower.includes("ktx")
+  ) {
     return "station";
   }
   if (lower.includes("pack") || lower.includes("bag")) return "packing";

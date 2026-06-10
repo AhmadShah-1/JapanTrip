@@ -4,10 +4,12 @@ import { useDeferredValue, useState, useTransition } from "react";
 
 import type { TripAppData } from "@/lib/trip-types";
 import {
+  cleanText,
   formatMoney,
   formatUsdWithLocal,
   getActivityCost,
   sumMoney,
+  toSearchText,
 } from "@/lib/trip-utils";
 
 type TabId =
@@ -264,7 +266,11 @@ export function TripCompanionApp({
   ).sort();
 
   const availableTags = Array.from(
-    new Set(data.activities.flatMap((activity) => activity.tags)),
+    new Set(
+      data.activities.flatMap((activity) =>
+        activity.tags.map((tag) => cleanText(tag)),
+      ),
+    ),
   ).sort();
 
   const availableCities = Array.from(
@@ -281,14 +287,27 @@ export function TripCompanionApp({
         if (calendarCity !== "All" && activity.city !== calendarCity) return false;
         if (
           calendarTag !== "All" &&
-          !activity.tags.some((tag) => tag === calendarTag)
+          !activity.tags.some(
+            (tag) => toSearchText(tag) === toSearchText(calendarTag),
+          )
         ) {
           return false;
         }
-        const haystack = `${activity.title} ${activity.description}`.toLowerCase();
+        const haystack = toSearchText(
+          [
+            activity.title,
+            activity.description,
+            activity.city,
+            activity.category,
+            activity.division,
+            activity.tags.join(" "),
+            day.title,
+            day.subtitle,
+          ].join(" "),
+        );
         if (
           deferredCalendarSearch &&
-          !haystack.includes(deferredCalendarSearch.toLowerCase())
+          !haystack.includes(toSearchText(deferredCalendarSearch))
         ) {
           return false;
         }
@@ -305,10 +324,19 @@ export function TripCompanionApp({
       if (expenseStatus !== "All" && expense.status !== expenseStatus) {
         return false;
       }
-      const haystack = `${expense.name} ${expense.notes} ${expense.tags.join(" ")}`.toLowerCase();
+      const haystack = toSearchText(
+        [
+          expense.name,
+          expense.notes,
+          expense.tags.join(" "),
+          expense.division,
+          expense.status,
+          expense.date,
+        ].join(" "),
+      );
       if (
         deferredExpenseSearch &&
-        !haystack.includes(deferredExpenseSearch.toLowerCase())
+        !haystack.includes(toSearchText(deferredExpenseSearch))
       ) {
         return false;
       }

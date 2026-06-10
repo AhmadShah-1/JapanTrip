@@ -13,7 +13,7 @@ import type {
   TripDay,
 } from "@/lib/trip-types";
 import { getSeedData } from "@/lib/trip-seed";
-import { joinTags, parseTags } from "@/lib/trip-utils";
+import { cleanText, joinTags, parseTags } from "@/lib/trip-utils";
 
 const connectionString =
   process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "";
@@ -253,11 +253,11 @@ function mapTripDays(rows: Array<Record<string, unknown>>): TripDay[] {
   return rows.map((row) => ({
     id: String(row.id),
     date: String(row.date_text),
-    city: String(row.city),
-    title: String(row.title),
-    subtitle: String(row.subtitle),
-    hotel: String(row.hotel),
-    notes: String(row.notes),
+    city: cleanText(String(row.city)),
+    title: cleanText(String(row.title)),
+    subtitle: cleanText(String(row.subtitle)),
+    hotel: cleanText(String(row.hotel)),
+    notes: cleanText(String(row.notes)),
   }));
 }
 
@@ -266,12 +266,12 @@ function mapActivities(rows: Array<Record<string, unknown>>): Activity[] {
     id: String(row.id),
     tripDayId: String(row.trip_day_id),
     date: String(row.date_text),
-    city: String(row.city),
-    timeLabel: String(row.time_label),
-    title: String(row.title),
-    description: String(row.description),
-    category: String(row.category),
-    division: String(row.division),
+    city: cleanText(String(row.city)),
+    timeLabel: cleanText(String(row.time_label)),
+    title: cleanText(String(row.title)),
+    description: cleanText(String(row.description)),
+    category: cleanText(String(row.category)),
+    division: cleanText(String(row.division)),
     tags: parseTags(String(row.tags_text)),
     estimatedCost: row.estimated_cost === null ? null : Number(row.estimated_cost),
     actualCost: row.actual_cost === null ? null : Number(row.actual_cost),
@@ -289,13 +289,13 @@ function mapActivities(rows: Array<Record<string, unknown>>): Activity[] {
 function mapExpenses(rows: Array<Record<string, unknown>>): Expense[] {
   return rows.map((row) => ({
     id: String(row.id),
-    name: String(row.name),
+    name: cleanText(String(row.name)),
     amount: Number(row.amount),
     currency: String(row.currency) as Expense["currency"],
     usdAmount: Number(row.usd_amount),
-    division: String(row.division),
+    division: cleanText(String(row.division)),
     tags: parseTags(String(row.tags_text)),
-    notes: String(row.notes),
+    notes: cleanText(String(row.notes)),
     date: String(row.date_text),
     status: String(row.status) as Expense["status"],
     sourceType: String(row.source_type) as Expense["sourceType"],
@@ -307,20 +307,20 @@ function mapBookings(rows: Array<Record<string, unknown>>): Booking[] {
   return rows.map((row) => ({
     id: String(row.id),
     kind: String(row.kind) as Booking["kind"],
-    title: String(row.title),
-    provider: String(row.provider),
-    confirmationCode: String(row.confirmation_code),
+    title: cleanText(String(row.title)),
+    provider: cleanText(String(row.provider)),
+    confirmationCode: cleanText(String(row.confirmation_code)),
     startDateTime: String(row.start_date_time),
     endDateTime: String(row.end_date_time),
-    origin: String(row.origin),
-    destination: String(row.destination),
-    terminal: String(row.terminal),
-    address: String(row.address),
+    origin: cleanText(String(row.origin)),
+    destination: cleanText(String(row.destination)),
+    terminal: cleanText(String(row.terminal)),
+    address: cleanText(String(row.address)),
     cost: row.cost === null ? null : Number(row.cost),
     currency: (row.currency as Booking["currency"]) ?? null,
     usdCost: row.usd_cost === null ? null : Number(row.usd_cost),
-    leaveBy: String(row.leave_by),
-    notes: String(row.notes),
+    leaveBy: cleanText(String(row.leave_by)),
+    notes: cleanText(String(row.notes)),
     sourceType: String(row.source_type) as Booking["sourceType"],
     sourceUrl: row.source_url ? String(row.source_url) : null,
   }));
@@ -330,10 +330,10 @@ function mapGuides(rows: Array<Record<string, unknown>>): Guide[] {
   return rows.map((row) => ({
     id: String(row.id),
     kind: String(row.kind) as Guide["kind"],
-    title: String(row.title),
-    summary: String(row.summary),
-    details: String(row.details),
-    leaveBy: String(row.leave_by),
+    title: cleanText(String(row.title)),
+    summary: cleanText(String(row.summary)),
+    details: cleanText(String(row.details)),
+    leaveBy: cleanText(String(row.leave_by)),
     linkedDate: String(row.linked_date),
     sourceType: String(row.source_type) as Guide["sourceType"],
   }));
@@ -342,9 +342,9 @@ function mapGuides(rows: Array<Record<string, unknown>>): Guide[] {
 function mapChecklist(rows: Array<Record<string, unknown>>): ChecklistItem[] {
   return rows.map((row) => ({
     id: String(row.id),
-    category: String(row.category),
-    label: String(row.label),
-    notes: String(row.notes),
+    category: cleanText(String(row.category)),
+    label: cleanText(String(row.label)),
+    notes: cleanText(String(row.notes)),
     status: String(row.status) as ChecklistItem["status"],
     estimatedCost:
       row.estimated_cost === null ? null : Number(row.estimated_cost),
@@ -358,7 +358,7 @@ function mapRates(rows: Array<Record<string, unknown>>): ExchangeRate[] {
   return rows.map((row) => ({
     currency: String(row.currency) as ExchangeRate["currency"],
     usdRate: Number(row.usd_rate),
-    note: String(row.note),
+    note: cleanText(String(row.note)),
     updatedAt: String(row.updated_at),
   }));
 }
@@ -431,10 +431,10 @@ export async function createRecord(
           id, name, amount, currency, usd_amount, division, tags_text,
           notes, date_text, status, source_type, source_url
         ) VALUES (
-          ${id}, ${String(record.name ?? "")}, ${Number(record.amount ?? 0)},
+          ${id}, ${cleanText(String(record.name ?? ""))}, ${Number(record.amount ?? 0)},
           ${String(record.currency ?? "USD")}, ${Number(record.usdAmount ?? 0)},
-          ${String(record.division ?? "misc")}, ${joinTags(parseTags(String(record.tags ?? "")))},
-          ${String(record.notes ?? "")}, ${String(record.date ?? "")}, ${String(record.status ?? "planned")},
+          ${cleanText(String(record.division ?? "misc"))}, ${joinTags(parseTags(String(record.tags ?? "")))},
+          ${cleanText(String(record.notes ?? ""))}, ${String(record.date ?? "")}, ${String(record.status ?? "planned")},
           ${String(record.sourceType ?? "manual")}, ${record.sourceUrl ? String(record.sourceUrl) : null}
         )
       `;
@@ -449,9 +449,9 @@ export async function createRecord(
           usd_actual_cost, source_type, source_url, booking_needed, priority
         ) VALUES (
           ${id}, ${String(record.tripDayId ?? "")}, ${String(record.date ?? "")},
-          ${String(record.city ?? "")}, ${String(record.timeLabel ?? "")},
-          ${String(record.title ?? "")}, ${String(record.description ?? "")},
-          ${String(record.category ?? "Activity")}, ${String(record.division ?? "activities")},
+          ${cleanText(String(record.city ?? ""))}, ${cleanText(String(record.timeLabel ?? ""))},
+          ${cleanText(String(record.title ?? ""))}, ${cleanText(String(record.description ?? ""))},
+          ${cleanText(String(record.category ?? "Activity"))}, ${cleanText(String(record.division ?? "activities"))},
           ${joinTags(parseTags(String(record.tags ?? "")))},
           ${record.estimatedCost === null ? null : Number(record.estimatedCost ?? 0)},
           ${record.actualCost === null ? null : Number(record.actualCost ?? 0)},
@@ -474,15 +474,15 @@ export async function createRecord(
           origin, destination, terminal, address, cost, currency, usd_cost, leave_by,
           notes, source_type, source_url
         ) VALUES (
-          ${id}, ${String(record.kind ?? "transfer")}, ${String(record.title ?? "")},
-          ${String(record.provider ?? "")}, ${String(record.confirmationCode ?? "")},
+          ${id}, ${String(record.kind ?? "transfer")}, ${cleanText(String(record.title ?? ""))},
+          ${cleanText(String(record.provider ?? ""))}, ${cleanText(String(record.confirmationCode ?? ""))},
           ${String(record.startDateTime ?? "")}, ${String(record.endDateTime ?? "")},
-          ${String(record.origin ?? "")}, ${String(record.destination ?? "")},
-          ${String(record.terminal ?? "")}, ${String(record.address ?? "")},
+          ${cleanText(String(record.origin ?? ""))}, ${cleanText(String(record.destination ?? ""))},
+          ${cleanText(String(record.terminal ?? ""))}, ${cleanText(String(record.address ?? ""))},
           ${record.cost === null ? null : Number(record.cost ?? 0)},
           ${record.currency ? String(record.currency) : null},
           ${record.usdCost === null ? null : Number(record.usdCost ?? 0)},
-          ${String(record.leaveBy ?? "")}, ${String(record.notes ?? "")},
+          ${cleanText(String(record.leaveBy ?? ""))}, ${cleanText(String(record.notes ?? ""))},
           ${String(record.sourceType ?? "manual")},
           ${record.sourceUrl ? String(record.sourceUrl) : null}
         )
@@ -495,9 +495,9 @@ export async function createRecord(
         INSERT INTO guides (
           id, kind, title, summary, details, leave_by, linked_date, source_type
         ) VALUES (
-          ${id}, ${String(record.kind ?? "transport")}, ${String(record.title ?? "")},
-          ${String(record.summary ?? "")}, ${String(record.details ?? "")},
-          ${String(record.leaveBy ?? "")}, ${String(record.linkedDate ?? "")},
+          ${id}, ${String(record.kind ?? "transport")}, ${cleanText(String(record.title ?? ""))},
+          ${cleanText(String(record.summary ?? ""))}, ${cleanText(String(record.details ?? ""))},
+          ${cleanText(String(record.leaveBy ?? ""))}, ${String(record.linkedDate ?? "")},
           ${String(record.sourceType ?? "manual")}
         )
       `;
@@ -509,8 +509,8 @@ export async function createRecord(
         INSERT INTO checklist_items (
           id, category, label, notes, status, estimated_cost, currency, usd_estimated_cost
         ) VALUES (
-          ${id}, ${String(record.category ?? "prep")}, ${String(record.label ?? "")},
-          ${String(record.notes ?? "")}, ${String(record.status ?? "todo")},
+          ${id}, ${cleanText(String(record.category ?? "prep"))}, ${cleanText(String(record.label ?? ""))},
+          ${cleanText(String(record.notes ?? ""))}, ${String(record.status ?? "todo")},
           ${record.estimatedCost === null ? null : Number(record.estimatedCost ?? 0)},
           ${record.currency ? String(record.currency) : null},
           ${record.usdEstimatedCost === null ? null : Number(record.usdEstimatedCost ?? 0)}
@@ -538,13 +538,13 @@ export async function updateRecord(
     case "expenses":
       await sql`
         UPDATE expenses
-        SET name = ${String(record.name ?? "")},
+        SET name = ${cleanText(String(record.name ?? ""))},
             amount = ${Number(record.amount ?? 0)},
             currency = ${String(record.currency ?? "USD")},
             usd_amount = ${Number(record.usdAmount ?? 0)},
-            division = ${String(record.division ?? "misc")},
+            division = ${cleanText(String(record.division ?? "misc"))},
             tags_text = ${joinTags(parseTags(String(record.tags ?? "")))},
-            notes = ${String(record.notes ?? "")},
+            notes = ${cleanText(String(record.notes ?? ""))},
             date_text = ${String(record.date ?? "")},
             status = ${String(record.status ?? "planned")},
             source_type = ${String(record.sourceType ?? "manual")},
@@ -557,12 +557,12 @@ export async function updateRecord(
         UPDATE activities
         SET trip_day_id = ${String(record.tripDayId ?? "")},
             date_text = ${String(record.date ?? "")},
-            city = ${String(record.city ?? "")},
-            time_label = ${String(record.timeLabel ?? "")},
-            title = ${String(record.title ?? "")},
-            description = ${String(record.description ?? "")},
-            category = ${String(record.category ?? "Activity")},
-            division = ${String(record.division ?? "activities")},
+            city = ${cleanText(String(record.city ?? ""))},
+            time_label = ${cleanText(String(record.timeLabel ?? ""))},
+            title = ${cleanText(String(record.title ?? ""))},
+            description = ${cleanText(String(record.description ?? ""))},
+            category = ${cleanText(String(record.category ?? "Activity"))},
+            division = ${cleanText(String(record.division ?? "activities"))},
             tags_text = ${joinTags(parseTags(String(record.tags ?? "")))},
             estimated_cost = ${record.estimatedCost === null ? null : Number(record.estimatedCost ?? 0)},
             actual_cost = ${record.actualCost === null ? null : Number(record.actualCost ?? 0)},
@@ -580,20 +580,20 @@ export async function updateRecord(
       await sql`
         UPDATE bookings
         SET kind = ${String(record.kind ?? "transfer")},
-            title = ${String(record.title ?? "")},
-            provider = ${String(record.provider ?? "")},
-            confirmation_code = ${String(record.confirmationCode ?? "")},
+            title = ${cleanText(String(record.title ?? ""))},
+            provider = ${cleanText(String(record.provider ?? ""))},
+            confirmation_code = ${cleanText(String(record.confirmationCode ?? ""))},
             start_date_time = ${String(record.startDateTime ?? "")},
             end_date_time = ${String(record.endDateTime ?? "")},
-            origin = ${String(record.origin ?? "")},
-            destination = ${String(record.destination ?? "")},
-            terminal = ${String(record.terminal ?? "")},
-            address = ${String(record.address ?? "")},
+            origin = ${cleanText(String(record.origin ?? ""))},
+            destination = ${cleanText(String(record.destination ?? ""))},
+            terminal = ${cleanText(String(record.terminal ?? ""))},
+            address = ${cleanText(String(record.address ?? ""))},
             cost = ${record.cost === null ? null : Number(record.cost ?? 0)},
             currency = ${record.currency ? String(record.currency) : null},
             usd_cost = ${record.usdCost === null ? null : Number(record.usdCost ?? 0)},
-            leave_by = ${String(record.leaveBy ?? "")},
-            notes = ${String(record.notes ?? "")},
+            leave_by = ${cleanText(String(record.leaveBy ?? ""))},
+            notes = ${cleanText(String(record.notes ?? ""))},
             source_type = ${String(record.sourceType ?? "manual")},
             source_url = ${record.sourceUrl ? String(record.sourceUrl) : null}
         WHERE id = ${id}
@@ -603,10 +603,10 @@ export async function updateRecord(
       await sql`
         UPDATE guides
         SET kind = ${String(record.kind ?? "transport")},
-            title = ${String(record.title ?? "")},
-            summary = ${String(record.summary ?? "")},
-            details = ${String(record.details ?? "")},
-            leave_by = ${String(record.leaveBy ?? "")},
+            title = ${cleanText(String(record.title ?? ""))},
+            summary = ${cleanText(String(record.summary ?? ""))},
+            details = ${cleanText(String(record.details ?? ""))},
+            leave_by = ${cleanText(String(record.leaveBy ?? ""))},
             linked_date = ${String(record.linkedDate ?? "")},
             source_type = ${String(record.sourceType ?? "manual")}
         WHERE id = ${id}
@@ -615,9 +615,9 @@ export async function updateRecord(
     case "checklist":
       await sql`
         UPDATE checklist_items
-        SET category = ${String(record.category ?? "prep")},
-            label = ${String(record.label ?? "")},
-            notes = ${String(record.notes ?? "")},
+        SET category = ${cleanText(String(record.category ?? "prep"))},
+            label = ${cleanText(String(record.label ?? ""))},
+            notes = ${cleanText(String(record.notes ?? ""))},
             status = ${String(record.status ?? "todo")},
             estimated_cost = ${record.estimatedCost === null ? null : Number(record.estimatedCost ?? 0)},
             currency = ${record.currency ? String(record.currency) : null},
