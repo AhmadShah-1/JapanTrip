@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  useDeferredValue,
-  useState,
-  useTransition,
-} from "react";
+import { useDeferredValue, useState, useTransition } from "react";
 
-import type {
-  TripAppData,
-} from "@/lib/trip-types";
+import type { TripAppData } from "@/lib/trip-types";
 import {
   formatMoney,
   formatUsdWithLocal,
@@ -90,12 +84,12 @@ type ChecklistDraft = {
 };
 
 const tabs: Array<{ id: TabId; label: string }> = [
-  { id: "dashboard", label: "Dashboard" },
+  { id: "dashboard", label: "Overview" },
   { id: "calendar", label: "Calendar" },
   { id: "expenses", label: "Expenses" },
   { id: "budget", label: "Budget" },
   { id: "bookings", label: "Bookings" },
-  { id: "guidance", label: "Guidance / Steps" },
+  { id: "guidance", label: "Guidance" },
   { id: "checklist", label: "Checklist" },
 ];
 
@@ -253,6 +247,7 @@ export function TripCompanionApp({
   const [expenseSort, setExpenseSort] = useState<"date" | "amount" | "division">(
     "date",
   );
+
   const deferredCalendarSearch = useDeferredValue(calendarSearch);
   const deferredExpenseSearch = useDeferredValue(expenseSearch);
 
@@ -274,28 +269,29 @@ export function TripCompanionApp({
   const dayLookup = new Map(data.tripDays.map((day) => [day.id, day]));
 
   const filteredDays = data.tripDays
-      .map((day) => ({
-        day,
-        activities: data.activities.filter((activity) => {
-          if (activity.tripDayId !== day.id) return false;
-          if (calendarCity !== "All" && activity.city !== calendarCity) return false;
-          if (
-            calendarTag !== "All" &&
-            !activity.tags.some((tag) => tag === calendarTag)
-          ) {
-            return false;
-          }
-          const haystack = `${activity.title} ${activity.description}`.toLowerCase();
-          if (
-            deferredCalendarSearch &&
-            !haystack.includes(deferredCalendarSearch.toLowerCase())
-          ) {
-            return false;
-          }
-          return true;
-        }),
-      }))
-      .filter((entry) => entry.activities.length > 0 || calendarCity === "All");
+    .map((day) => ({
+      day,
+      activities: data.activities.filter((activity) => {
+        if (activity.tripDayId !== day.id) return false;
+        if (calendarCity !== "All" && activity.city !== calendarCity) return false;
+        if (
+          calendarTag !== "All" &&
+          !activity.tags.some((tag) => tag === calendarTag)
+        ) {
+          return false;
+        }
+        const haystack = `${activity.title} ${activity.description}`.toLowerCase();
+        if (
+          deferredCalendarSearch &&
+          !haystack.includes(deferredCalendarSearch.toLowerCase())
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    }))
+    .filter((entry) => entry.activities.length > 0 || calendarCity === "All");
+
   const filteredExpenses = data.expenses
     .filter((expense) => {
       if (expenseDivision !== "All" && expense.division !== expenseDivision) {
@@ -339,40 +335,55 @@ export function TripCompanionApp({
   );
 
   const budgetRows = divisions.map((division) => {
-      const expenses = data.expenses.filter((item) => item.division === division);
-      const activities = data.activities.filter((item) => item.division === division);
-      return {
-        division,
-        paid: sumMoney(
-          expenses
-            .filter((item) => item.status === "paid")
-            .map((item) => item.usdAmount),
-        ),
-        booked: sumMoney(
-          expenses
-            .filter((item) => item.status === "booked")
-            .map((item) => item.usdAmount),
-        ),
-        planned: sumMoney(
-          expenses
-            .filter((item) => item.status === "planned")
-            .map((item) => item.usdAmount),
-        ),
-        activityPlanned: sumMoney(
-          activities.map((item) => item.usdEstimatedCost),
-        ),
-      };
-    });
+    const expenses = data.expenses.filter((item) => item.division === division);
+    const activities = data.activities.filter((item) => item.division === division);
+    return {
+      division,
+      paid: sumMoney(
+        expenses
+          .filter((item) => item.status === "paid")
+          .map((item) => item.usdAmount),
+      ),
+      booked: sumMoney(
+        expenses
+          .filter((item) => item.status === "booked")
+          .map((item) => item.usdAmount),
+      ),
+      planned: sumMoney(
+        expenses
+          .filter((item) => item.status === "planned")
+          .map((item) => item.usdAmount),
+      ),
+      activityPlanned: sumMoney(
+        activities.map((item) => item.usdEstimatedCost),
+      ),
+    };
+  });
+
+  const expenseTypeTotals = divisions
+    .map((division) => {
+      const total = sumMoney(
+        data.expenses
+          .filter((item) => item.division === division)
+          .map((item) => item.usdAmount),
+      );
+      return { division, total };
+    })
+    .filter((item) => item.total > 0)
+    .sort((left, right) => right.total - left.total);
+
+  const visibleExpenseTotal = sumMoney(filteredExpenses.map((expense) => expense.usdAmount));
 
   const upcomingBookings = data.bookings
     .filter((booking) => booking.startDateTime.slice(0, 10) >= todayKey())
-    .slice(0, 4);
+    .slice(0, 8);
 
-  const nextTripDay = data.tripDays.find((day) => day.date >= todayKey()) ?? data.tripDays[0];
+  const nextTripDay =
+    data.tripDays.find((day) => day.date >= todayKey()) ?? data.tripDays[0];
 
   const urgentActivities = data.activities
     .filter((activity) => activity.bookingNeeded || activity.priority >= 4)
-    .slice(0, 6);
+    .slice(0, 10);
 
   function runMutation(
     work: () => Promise<TripAppData>,
@@ -388,7 +399,9 @@ export function TripCompanionApp({
         setStatusMessage(successMessage);
         resetForm?.();
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Something went wrong.");
+        setErrorMessage(
+          error instanceof Error ? error.message : "Something went wrong.",
+        );
       }
     });
   }
@@ -545,21 +558,16 @@ export function TripCompanionApp({
 
   return (
     <div className="shell">
-      <header className="hero">
-        <div className="hero-overlay" />
-        <div className="hero-content">
-          <p className="eyebrow">June 15 to July 13, 2026 · Japan + Korea</p>
+      <header className="sheet-header">
+        <div>
+          <p className="eyebrow">June 15 to July 13, 2026 | Japan + Korea</p>
           <h1>Trip Companion</h1>
-          <p className="hero-sub">
-            A shared planning and spending dashboard for Tokyo, Kyoto, Osaka,
-            Seoul, and Busan.
-          </p>
-          <div className="hero-chips">
-            <span>29 days</span>
-            <span>Public edits</span>
-            <span>{data.persistenceMode === "database" ? "Neon live sync" : "Seed-only mode"}</span>
-            <span>USD-first budgeting</span>
-          </div>
+        </div>
+        <div className="header-meta">
+          <span>{data.tripDays.length} days</span>
+          <span>{data.activities.length} activities</span>
+          <span>{data.expenses.length} expense rows</span>
+          <span>{data.persistenceMode === "database" ? "live db" : "seed only"}</span>
         </div>
       </header>
 
@@ -569,22 +577,22 @@ export function TripCompanionApp({
             <span className="status-pill ok">Shared persistence enabled</span>
           ) : (
             <span className="status-pill warn">
-              DATABASE_URL missing: app is rendering seed data only
+              DATABASE_URL missing or overridden; app is in seed-only mode
             </span>
           )}
         </div>
-        <div className="status-actions">
-          {data.persistenceMode === "database" ? (
-            <button
-              className="ghost-button"
-              onClick={() => runMutation(() => resetData(), "Database reset from seed.")}
-              disabled={isPending}
-              type="button"
-            >
-              Re-seed from notes
-            </button>
-          ) : null}
-        </div>
+        {data.persistenceMode === "database" ? (
+          <button
+            className="ghost-button"
+            onClick={() =>
+              runMutation(() => resetData(), "Database reset from seed.")
+            }
+            disabled={isPending}
+            type="button"
+          >
+            Re-seed
+          </button>
+        ) : null}
       </div>
 
       {statusMessage ? <div className="toast success">{statusMessage}</div> : null}
@@ -607,252 +615,202 @@ export function TripCompanionApp({
         {activeTab === "dashboard" ? (
           <section className="stack">
             <div className="metric-grid">
-              <MetricCard label="Spent" value={formatMoney(paidTotal, "USD")} hint="Paid expenses only" />
-              <MetricCard label="Booked" value={formatMoney(bookedTotal, "USD")} hint="Booked but not marked paid" />
-              <MetricCard label="Planned" value={formatMoney(plannedTotal, "USD")} hint="Planned manual expenses" />
+              <MetricCard label="Spent" value={formatMoney(paidTotal, "USD")} hint="paid" />
               <MetricCard
-                label="Activity Estimates"
+                label="Booked"
+                value={formatMoney(bookedTotal, "USD")}
+                hint="booked"
+              />
+              <MetricCard
+                label="Planned"
+                value={formatMoney(plannedTotal, "USD")}
+                hint="planned"
+              />
+              <MetricCard
+                label="Activity Est."
                 value={formatMoney(activityEstimateTotal, "USD")}
-                hint="Estimated from itinerary items"
+                hint="itinerary est."
               />
             </div>
 
-            <div className="two-up">
-              <Panel title="Next Up" subtitle="What matters next">
-                <div className="list">
-                  <ListRow
-                    label="Next trip day"
-                    value={nextTripDay ? `${nextTripDay.date} · ${nextTripDay.title}` : "No day found"}
-                  />
-                  {upcomingBookings.map((booking) => (
-                    <ListRow
-                      key={booking.id}
-                      label={booking.kind}
-                      value={`${booking.title} · ${booking.startDateTime.slice(0, 16).replace("T", " ")}`}
-                    />
-                  ))}
-                </div>
+            <div className="overview-grid">
+              <Panel title="Next / Critical" subtitle="high-signal scan view">
+                <CompactTable
+                  headers={["Type", "When", "Item", "Value"]}
+                  rows={[
+                    ...(nextTripDay
+                      ? [
+                          [
+                            "Day",
+                            nextTripDay.date,
+                            nextTripDay.title,
+                            nextTripDay.city,
+                          ],
+                        ]
+                      : []),
+                    ...upcomingBookings.map((booking) => [
+                      booking.kind,
+                      booking.startDateTime.slice(0, 16).replace("T", " "),
+                      booking.title,
+                      formatMoney(booking.usdCost, "USD"),
+                    ]),
+                    ...urgentActivities.slice(0, 4).map((activity) => [
+                      "Urgent",
+                      `${activity.date} ${activity.timeLabel}`,
+                      activity.title,
+                      formatMoney(getActivityCost(activity), "USD"),
+                    ]),
+                  ]}
+                />
               </Panel>
 
-              <Panel title="Urgent / High Priority" subtitle="Bookings and critical moments">
-                <div className="list">
-                  {urgentActivities.map((activity) => (
-                    <ListRow
-                      key={activity.id}
-                      label={activity.city}
-                      value={`${activity.date} · ${activity.timeLabel} · ${activity.title}`}
-                    />
-                  ))}
-                </div>
+              <Panel title="Budget by Division" subtitle="all totals in one sheet">
+                <CompactTable
+                  headers={["Division", "Paid", "Booked", "Planned", "Activity"]}
+                  rows={budgetRows.map((row) => [
+                    row.division,
+                    formatMoney(row.paid, "USD"),
+                    formatMoney(row.booked, "USD"),
+                    formatMoney(row.planned, "USD"),
+                    formatMoney(row.activityPlanned, "USD"),
+                  ])}
+                />
               </Panel>
             </div>
 
-            <Panel title="Budget Snapshot" subtitle="By division">
-              <div className="budget-list">
-                {budgetRows.map((row) => (
-                  <div key={row.division} className="budget-row">
-                    <div>
-                      <strong>{row.division}</strong>
-                      <p>
-                        Paid {formatMoney(row.paid, "USD")} · Booked{" "}
-                        {formatMoney(row.booked, "USD")} · Planned{" "}
-                        {formatMoney(row.planned, "USD")}
-                      </p>
-                    </div>
-                    <span className="budget-chip">
-                      Activities {formatMoney(row.activityPlanned, "USD")}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
+            <div className="overview-grid">
+              <Panel title="Purchase Types" subtitle="expense mix by division">
+                <ExpensePieChart items={expenseTypeTotals} />
+              </Panel>
+
+              <Panel title="Totals Snapshot" subtitle="quick rollup">
+                <CompactTable
+                  headers={["Metric", "Value"]}
+                  rows={[
+                    ["All expenses", formatMoney(sumMoney(data.expenses.map((expense) => expense.usdAmount)), "USD")],
+                    ["Visible expenses", formatMoney(visibleExpenseTotal, "USD")],
+                    ["Paid expenses", formatMoney(paidTotal, "USD")],
+                    ["Booked expenses", formatMoney(bookedTotal, "USD")],
+                    ["Planned expenses", formatMoney(plannedTotal, "USD")],
+                  ]}
+                />
+              </Panel>
+            </div>
           </section>
         ) : null}
 
         {activeTab === "calendar" ? (
           <section className="stack">
-            <Panel title="Activity Editor" subtitle="Add or update itinerary items and their costs">
-              <div className="form-grid">
-                <label>
-                  Trip day
-                  <select
-                    value={activityDraft.tripDayId}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        tripDayId: event.target.value,
-                      }))
-                    }
+            <div className="section-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setEditingActivityId(null);
+                  setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
+                }}
+              >
+                Add new activity
+              </button>
+            </div>
+            <details className="editor-panel">
+              <summary>Activity editor</summary>
+              <div className="editor-body">
+                <div className="form-grid">
+                  <label>
+                    Trip day
+                    <select
+                      value={activityDraft.tripDayId}
+                      onChange={(event) =>
+                        setActivityDraft((current) => ({
+                          ...current,
+                          tripDayId: event.target.value,
+                        }))
+                      }
+                    >
+                      {data.tripDays.map((day) => (
+                        <option key={day.id} value={day.id}>
+                          {day.date} | {day.city} | {day.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Time
+                    <input
+                      value={activityDraft.timeLabel}
+                      onChange={(event) =>
+                        setActivityDraft((current) => ({
+                          ...current,
+                          timeLabel: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Title
+                    <input
+                      value={activityDraft.title}
+                      onChange={(event) =>
+                        setActivityDraft((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Est. cost
+                    <input
+                      value={activityDraft.estimatedCost}
+                      onChange={(event) =>
+                        setActivityDraft((current) => ({
+                          ...current,
+                          estimatedCost: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="full">
+                    Notes
+                    <textarea
+                      rows={2}
+                      value={activityDraft.description}
+                      onChange={(event) =>
+                        setActivityDraft((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" onClick={handleActivitySubmit} type="button">
+                    {editingActivityId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
+                      setEditingActivityId(null);
+                    }}
+                    type="button"
                   >
-                    {data.tripDays.map((day) => (
-                      <option key={day.id} value={day.id}>
-                        {day.date} · {day.city} · {day.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Time label
-                  <input
-                    value={activityDraft.timeLabel}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        timeLabel: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Title
-                  <input
-                    value={activityDraft.title}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        title: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Category
-                  <input
-                    value={activityDraft.category}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        category: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Division
-                  <input
-                    value={activityDraft.division}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        division: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Tags
-                  <input
-                    value={activityDraft.tags}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        tags: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Estimated cost
-                  <input
-                    value={activityDraft.estimatedCost}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        estimatedCost: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Actual cost
-                  <input
-                    value={activityDraft.actualCost}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        actualCost: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Currency
-                  <select
-                    value={activityDraft.currency}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        currency: event.target.value as ActivityDraft["currency"],
-                      }))
-                    }
-                  >
-                    <option value="">None</option>
-                    <option value="USD">USD</option>
-                    <option value="JPY">JPY</option>
-                    <option value="KRW">KRW</option>
-                  </select>
-                </label>
-                <label>
-                  Priority
-                  <input
-                    value={activityDraft.priority}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        priority: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="full">
-                  Description
-                  <textarea
-                    rows={4}
-                    value={activityDraft.description}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="full inline-check">
-                  <input
-                    type="checkbox"
-                    checked={activityDraft.bookingNeeded}
-                    onChange={(event) =>
-                      setActivityDraft((current) => ({
-                        ...current,
-                        bookingNeeded: event.target.checked,
-                      }))
-                    }
-                  />
-                  Booking required
-                </label>
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="form-actions">
-                <button className="primary-button" onClick={handleActivitySubmit} type="button">
-                  {editingActivityId ? "Update activity" : "Add activity"}
-                </button>
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    setActivityDraft(emptyActivityDraft(data.tripDays[0]?.id ?? ""));
-                    setEditingActivityId(null);
-                  }}
-                  type="button"
-                >
-                  Clear
-                </button>
-              </div>
-            </Panel>
+            </details>
 
-            <Panel title="Filters" subtitle="Narrow the itinerary">
+            <Panel title="Calendar Grid" subtitle="compact day rows; click for details">
               <div className="filters">
                 <label>
                   City
-                  <select value={calendarCity} onChange={(event) => setCalendarCity(event.target.value)}>
+                  <select
+                    value={calendarCity}
+                    onChange={(event) => setCalendarCity(event.target.value)}
+                  >
                     <option>All</option>
                     {availableCities.map((city) => (
                       <option key={city}>{city}</option>
@@ -861,7 +819,10 @@ export function TripCompanionApp({
                 </label>
                 <label>
                   Tag
-                  <select value={calendarTag} onChange={(event) => setCalendarTag(event.target.value)}>
+                  <select
+                    value={calendarTag}
+                    onChange={(event) => setCalendarTag(event.target.value)}
+                  >
                     <option>All</option>
                     {availableTags.map((tag) => (
                       <option key={tag}>{tag}</option>
@@ -870,240 +831,283 @@ export function TripCompanionApp({
                 </label>
                 <label>
                   Search
-                  <input value={calendarSearch} onChange={(event) => setCalendarSearch(event.target.value)} />
+                  <input
+                    value={calendarSearch}
+                    onChange={(event) => setCalendarSearch(event.target.value)}
+                  />
                 </label>
               </div>
-            </Panel>
 
-            {filteredDays.map(({ day, activities }) => {
-              const dayTotal = sumMoney(activities.map((activity) => getActivityCost(activity)));
-              return (
-                <Panel
-                  key={day.id}
-                  title={`${day.date} · ${day.city} · ${day.title}`}
-                  subtitle={`${day.subtitle} · ${day.hotel}`}
-                >
-                  <div className="day-total">
-                    Day activity total: <strong>{formatMoney(dayTotal, "USD")}</strong>
-                  </div>
-                  <div className="activity-list">
-                    {activities.map((activity) => {
-                      const money = formatUsdWithLocal(
-                        activity.usdActualCost ?? activity.usdEstimatedCost,
-                        activity.actualCost ?? activity.estimatedCost,
-                        activity.currency,
+              <div className="table-wrap">
+                <table className="dense-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>City</th>
+                      <th>Day</th>
+                      <th>Hotel</th>
+                      <th>Items</th>
+                      <th>Day Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDays.map(({ day, activities }) => {
+                      const dayTotal = sumMoney(
+                        activities.map((activity) => getActivityCost(activity)),
                       );
                       return (
-                        <article key={activity.id} className="activity-card">
-                          <div className="activity-top">
-                            <div>
-                              <p className="activity-time">{activity.timeLabel}</p>
-                              <h3>{activity.title}</h3>
+                        <ExpandableRow
+                          key={day.id}
+                          columns={[
+                            day.date,
+                            day.city,
+                            day.title,
+                            day.hotel || "-",
+                            String(activities.length),
+                            formatMoney(dayTotal, "USD"),
+                          ]}
+                          expandedContent={
+                            <div className="inner-table-wrap">
+                              <table className="dense-table inner-table">
+                                <thead>
+                                  <tr>
+                                    <th>Time</th>
+                                    <th>Activity</th>
+                                    <th>Category</th>
+                                    <th>Tags</th>
+                                    <th>Cost</th>
+                                    <th>Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {activities.map((activity) => {
+                                    const money = formatUsdWithLocal(
+                                      activity.usdActualCost ??
+                                        activity.usdEstimatedCost,
+                                      activity.actualCost ??
+                                        activity.estimatedCost,
+                                      activity.currency,
+                                    );
+                                    return (
+                                      <tr key={activity.id}>
+                                        <td>{activity.timeLabel}</td>
+                                        <td title={activity.description}>
+                                          {activity.title}
+                                        </td>
+                                        <td>{activity.category}</td>
+                                        <td>{activity.tags.join(", ") || "-"}</td>
+                                        <td title={money.title}>{money.label}</td>
+                                        <td className="actions-cell">
+                                          <button
+                                            className="small-button"
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingActivityId(activity.id);
+                                              setActivityDraft({
+                                                tripDayId: activity.tripDayId,
+                                                timeLabel: activity.timeLabel,
+                                                title: activity.title,
+                                                description: activity.description,
+                                                category: activity.category,
+                                                division: activity.division,
+                                                tags: activity.tags.join(", "),
+                                                estimatedCost:
+                                                  activity.estimatedCost?.toString() ??
+                                                  "",
+                                                actualCost:
+                                                  activity.actualCost?.toString() ??
+                                                  "",
+                                                currency: activity.currency ?? "",
+                                                sourceUrl: activity.sourceUrl ?? "",
+                                                bookingNeeded:
+                                                  activity.bookingNeeded,
+                                                priority: String(activity.priority),
+                                              });
+                                            }}
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            className="small-button danger"
+                                            type="button"
+                                            onClick={() =>
+                                              runMutation(
+                                                () =>
+                                                  mutateData("DELETE", {
+                                                    entity: "activities",
+                                                    id: activity.id,
+                                                    record: {},
+                                                  }),
+                                                "Activity deleted.",
+                                              )
+                                            }
+                                          >
+                                            Delete
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
-                            <div className="activity-actions">
-                              <span className="money-chip" title={money.title}>
-                                {money.label}
-                              </span>
-                              <button
-                                className="small-button"
-                                type="button"
-                                onClick={() => {
-                                  setEditingActivityId(activity.id);
-                                  setActivityDraft({
-                                    tripDayId: activity.tripDayId,
-                                    timeLabel: activity.timeLabel,
-                                    title: activity.title,
-                                    description: activity.description,
-                                    category: activity.category,
-                                    division: activity.division,
-                                    tags: activity.tags.join(", "),
-                                    estimatedCost:
-                                      activity.estimatedCost?.toString() ?? "",
-                                    actualCost: activity.actualCost?.toString() ?? "",
-                                    currency: activity.currency ?? "",
-                                    sourceUrl: activity.sourceUrl ?? "",
-                                    bookingNeeded: activity.bookingNeeded,
-                                    priority: String(activity.priority),
-                                  });
-                                  setActiveTab("calendar");
-                                }}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="small-button danger"
-                                type="button"
-                                onClick={() =>
-                                  runMutation(
-                                    () =>
-                                      mutateData("DELETE", {
-                                        entity: "activities",
-                                        id: activity.id,
-                                        record: {},
-                                      }),
-                                    "Activity deleted.",
-                                  )
-                                }
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                          <p>{activity.description}</p>
-                          <div className="tag-row">
-                            {activity.tags.map((tag) => (
-                              <span key={`${activity.id}-${tag}`} className="tag">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </article>
+                          }
+                        />
                       );
                     })}
-                  </div>
-                </Panel>
-              );
-            })}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
           </section>
         ) : null}
 
         {activeTab === "expenses" ? (
           <section className="stack">
-            <Panel title="Expense Ledger" subtitle="Track live spend, planned costs, and edits">
-              <div className="form-grid">
-                <label>
-                  Name
-                  <input
-                    value={expenseDraft.name}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Amount
-                  <input
-                    value={expenseDraft.amount}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        amount: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Currency
-                  <select
-                    value={expenseDraft.currency}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        currency: event.target.value as ExpenseDraft["currency"],
-                      }))
-                    }
+            <div className="section-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setEditingExpenseId(null);
+                  setExpenseDraft(emptyExpenseDraft());
+                }}
+              >
+                Add new expense
+              </button>
+            </div>
+            <details className="editor-panel">
+              <summary>Expense editor</summary>
+              <div className="editor-body">
+                <div className="form-grid">
+                  <label>
+                    Name
+                    <input
+                      value={expenseDraft.name}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Amount
+                    <input
+                      value={expenseDraft.amount}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          amount: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Currency
+                    <select
+                      value={expenseDraft.currency}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          currency: event.target.value as ExpenseDraft["currency"],
+                        }))
+                      }
+                    >
+                      <option value="USD">USD</option>
+                      <option value="JPY">JPY</option>
+                      <option value="KRW">KRW</option>
+                    </select>
+                  </label>
+                  <label>
+                    Division
+                    <input
+                      value={expenseDraft.division}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          division: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Date
+                    <input
+                      type="date"
+                      value={expenseDraft.date}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          date: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Status
+                    <select
+                      value={expenseDraft.status}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          status: event.target.value as ExpenseDraft["status"],
+                        }))
+                      }
+                    >
+                      <option value="planned">planned</option>
+                      <option value="booked">booked</option>
+                      <option value="paid">paid</option>
+                    </select>
+                  </label>
+                  <label className="full">
+                    Notes
+                    <textarea
+                      rows={2}
+                      value={expenseDraft.notes}
+                      onChange={(event) =>
+                        setExpenseDraft((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" onClick={handleExpenseSubmit} type="button">
+                    {editingExpenseId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setExpenseDraft(emptyExpenseDraft());
+                      setEditingExpenseId(null);
+                    }}
                   >
-                    <option value="USD">USD</option>
-                    <option value="JPY">JPY</option>
-                    <option value="KRW">KRW</option>
-                  </select>
-                </label>
-                <label>
-                  Division
-                  <input
-                    value={expenseDraft.division}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        division: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={expenseDraft.date}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        date: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Status
-                  <select
-                    value={expenseDraft.status}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        status: event.target.value as ExpenseDraft["status"],
-                      }))
-                    }
-                  >
-                    <option value="planned">planned</option>
-                    <option value="booked">booked</option>
-                    <option value="paid">paid</option>
-                  </select>
-                </label>
-                <label className="full">
-                  Tags
-                  <input
-                    value={expenseDraft.tags}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        tags: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="full">
-                  Notes
-                  <textarea
-                    rows={3}
-                    value={expenseDraft.notes}
-                    onChange={(event) =>
-                      setExpenseDraft((current) => ({
-                        ...current,
-                        notes: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="form-actions">
-                <button className="primary-button" onClick={handleExpenseSubmit} type="button">
-                  {editingExpenseId ? "Update expense" : "Add expense"}
-                </button>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => {
-                    setExpenseDraft(emptyExpenseDraft());
-                    setEditingExpenseId(null);
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-            </Panel>
+            </details>
 
-            <Panel title="Filters & Sorting" subtitle="Search and sort the ledger">
+            <Panel title="Expense Ledger" subtitle="dense sheet with expandable notes">
               <div className="filters">
                 <label>
                   Search
-                  <input value={expenseSearch} onChange={(event) => setExpenseSearch(event.target.value)} />
+                  <input
+                    value={expenseSearch}
+                    onChange={(event) => setExpenseSearch(event.target.value)}
+                  />
                 </label>
                 <label>
                   Division
-                  <select value={expenseDivision} onChange={(event) => setExpenseDivision(event.target.value)}>
+                  <select
+                    value={expenseDivision}
+                    onChange={(event) => setExpenseDivision(event.target.value)}
+                  >
                     <option>All</option>
                     {divisions.map((division) => (
                       <option key={division}>{division}</option>
@@ -1112,7 +1116,10 @@ export function TripCompanionApp({
                 </label>
                 <label>
                   Status
-                  <select value={expenseStatus} onChange={(event) => setExpenseStatus(event.target.value)}>
+                  <select
+                    value={expenseStatus}
+                    onChange={(event) => setExpenseStatus(event.target.value)}
+                  >
                     <option>All</option>
                     <option>planned</option>
                     <option>booked</option>
@@ -1121,25 +1128,29 @@ export function TripCompanionApp({
                 </label>
                 <label>
                   Sort
-                  <select value={expenseSort} onChange={(event) => setExpenseSort(event.target.value as typeof expenseSort)}>
+                  <select
+                    value={expenseSort}
+                    onChange={(event) =>
+                      setExpenseSort(event.target.value as typeof expenseSort)
+                    }
+                  >
                     <option value="date">date</option>
                     <option value="amount">amount</option>
                     <option value="division">division</option>
                   </select>
                 </label>
               </div>
-            </Panel>
 
-            <Panel title="Expense Table" subtitle="USD primary, local values on hover">
               <div className="table-wrap">
-                <table>
+                <table className="dense-table">
                   <thead>
                     <tr>
-                      <th>Name</th>
                       <th>Date</th>
+                      <th>Name</th>
                       <th>Division</th>
                       <th>Status</th>
                       <th>USD</th>
+                      <th>Tags</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -1151,59 +1162,75 @@ export function TripCompanionApp({
                         expense.currency,
                       );
                       return (
-                        <tr key={expense.id}>
-                          <td>
-                            <strong>{expense.name}</strong>
-                            <div className="table-sub">{expense.tags.join(", ")}</div>
-                          </td>
-                          <td>{expense.date}</td>
-                          <td>{expense.division}</td>
-                          <td>{expense.status}</td>
-                          <td title={money.title}>{money.label}</td>
-                          <td className="actions-cell">
-                            <button
-                              className="small-button"
-                              type="button"
-                              onClick={() => {
-                                setEditingExpenseId(expense.id);
-                                setExpenseDraft({
-                                  name: expense.name,
-                                  amount: String(expense.amount),
-                                  currency: expense.currency,
-                                  division: expense.division,
-                                  tags: expense.tags.join(", "),
-                                  notes: expense.notes,
-                                  date: expense.date,
-                                  status: expense.status,
-                                  sourceUrl: expense.sourceUrl ?? "",
-                                });
-                                setActiveTab("expenses");
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="small-button danger"
-                              type="button"
-                              onClick={() =>
-                                runMutation(
-                                  () =>
-                                    mutateData("DELETE", {
-                                      entity: "expenses",
-                                      id: expense.id,
-                                      record: {},
-                                    }),
-                                  "Expense deleted.",
-                                )
-                              }
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
+                        <ExpandableRow
+                          key={expense.id}
+                          columns={[
+                            expense.date,
+                            expense.name,
+                            expense.division,
+                            expense.status,
+                            money.label,
+                            expense.tags.join(", ") || "-",
+                            "",
+                          ]}
+                          actionCell={
+                            <>
+                              <button
+                                className="small-button"
+                                type="button"
+                                onClick={() => {
+                                  setEditingExpenseId(expense.id);
+                                  setExpenseDraft({
+                                    name: expense.name,
+                                    amount: String(expense.amount),
+                                    currency: expense.currency,
+                                    division: expense.division,
+                                    tags: expense.tags.join(", "),
+                                    notes: expense.notes,
+                                    date: expense.date,
+                                    status: expense.status,
+                                    sourceUrl: expense.sourceUrl ?? "",
+                                  });
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="small-button danger"
+                                type="button"
+                                onClick={() =>
+                                  runMutation(
+                                    () =>
+                                      mutateData("DELETE", {
+                                        entity: "expenses",
+                                        id: expense.id,
+                                        record: {},
+                                      }),
+                                    "Expense deleted.",
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          }
+                          expandedContent={
+                            <div className="expanded-copy">
+                              <div title={money.title}>Local value: {money.title}</div>
+                              <div>Notes: {expense.notes || "-"}</div>
+                            </div>
+                          }
+                        />
                       );
                     })}
                   </tbody>
+                  <tfoot>
+                    <tr className="totals-row">
+                      <td colSpan={4}>Visible total</td>
+                      <td>{formatMoney(visibleExpenseTotal, "USD")}</td>
+                      <td colSpan={2}>{filteredExpenses.length} rows</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </Panel>
@@ -1212,16 +1239,17 @@ export function TripCompanionApp({
 
         {activeTab === "budget" ? (
           <section className="stack">
-            <Panel title="Budget by Division" subtitle="Personal-spend model only">
+            <Panel title="Budget by Division" subtitle="single-sheet budget view">
               <div className="table-wrap">
-                <table>
+                <table className="dense-table">
                   <thead>
                     <tr>
                       <th>Division</th>
                       <th>Paid</th>
                       <th>Booked</th>
                       <th>Planned</th>
-                      <th>Activity Estimates</th>
+                      <th>Activity Est.</th>
+                      <th>Total Exposure</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1232,6 +1260,15 @@ export function TripCompanionApp({
                         <td>{formatMoney(row.booked, "USD")}</td>
                         <td>{formatMoney(row.planned, "USD")}</td>
                         <td>{formatMoney(row.activityPlanned, "USD")}</td>
+                        <td>
+                          {formatMoney(
+                            row.paid +
+                              row.booked +
+                              row.planned +
+                              row.activityPlanned,
+                            "USD",
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1243,360 +1280,551 @@ export function TripCompanionApp({
 
         {activeTab === "bookings" ? (
           <section className="stack">
-            <Panel title="Booking Editor" subtitle="Flights, hotels, trains, baggage, and transfers">
-              <div className="form-grid">
-                <label>
-                  Kind
-                  <select
-                    value={bookingDraft.kind}
-                    onChange={(event) =>
-                      setBookingDraft((current) => ({
-                        ...current,
-                        kind: event.target.value as BookingDraft["kind"],
-                      }))
-                    }
+            <div className="section-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setEditingBookingId(null);
+                  setBookingDraft(emptyBookingDraft());
+                }}
+              >
+                Add new booking
+              </button>
+            </div>
+            <details className="editor-panel">
+              <summary>Booking editor</summary>
+              <div className="editor-body">
+                <div className="form-grid">
+                  <label>
+                    Kind
+                    <select
+                      value={bookingDraft.kind}
+                      onChange={(event) =>
+                        setBookingDraft((current) => ({
+                          ...current,
+                          kind: event.target.value as BookingDraft["kind"],
+                        }))
+                      }
+                    >
+                      <option value="flight">flight</option>
+                      <option value="hotel">hotel</option>
+                      <option value="train">train</option>
+                      <option value="baggage">baggage</option>
+                      <option value="transfer">transfer</option>
+                    </select>
+                  </label>
+                  <label>
+                    Title
+                    <input
+                      value={bookingDraft.title}
+                      onChange={(event) =>
+                        setBookingDraft((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Start
+                    <input
+                      type="datetime-local"
+                      value={bookingDraft.startDateTime}
+                      onChange={(event) =>
+                        setBookingDraft((current) => ({
+                          ...current,
+                          startDateTime: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Leave by
+                    <input
+                      value={bookingDraft.leaveBy}
+                      onChange={(event) =>
+                        setBookingDraft((current) => ({
+                          ...current,
+                          leaveBy: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="full">
+                    Notes
+                    <textarea
+                      rows={2}
+                      value={bookingDraft.notes}
+                      onChange={(event) =>
+                        setBookingDraft((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" onClick={handleBookingSubmit} type="button">
+                    {editingBookingId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setBookingDraft(emptyBookingDraft());
+                      setEditingBookingId(null);
+                    }}
                   >
-                    <option value="flight">flight</option>
-                    <option value="hotel">hotel</option>
-                    <option value="train">train</option>
-                    <option value="baggage">baggage</option>
-                    <option value="transfer">transfer</option>
-                  </select>
-                </label>
-                <label>
-                  Title
-                  <input value={bookingDraft.title} onChange={(event) => setBookingDraft((current) => ({ ...current, title: event.target.value }))} />
-                </label>
-                <label>
-                  Provider
-                  <input value={bookingDraft.provider} onChange={(event) => setBookingDraft((current) => ({ ...current, provider: event.target.value }))} />
-                </label>
-                <label>
-                  Confirmation
-                  <input value={bookingDraft.confirmationCode} onChange={(event) => setBookingDraft((current) => ({ ...current, confirmationCode: event.target.value }))} />
-                </label>
-                <label>
-                  Start
-                  <input type="datetime-local" value={bookingDraft.startDateTime} onChange={(event) => setBookingDraft((current) => ({ ...current, startDateTime: event.target.value }))} />
-                </label>
-                <label>
-                  End
-                  <input type="datetime-local" value={bookingDraft.endDateTime} onChange={(event) => setBookingDraft((current) => ({ ...current, endDateTime: event.target.value }))} />
-                </label>
-                <label>
-                  Origin
-                  <input value={bookingDraft.origin} onChange={(event) => setBookingDraft((current) => ({ ...current, origin: event.target.value }))} />
-                </label>
-                <label>
-                  Destination
-                  <input value={bookingDraft.destination} onChange={(event) => setBookingDraft((current) => ({ ...current, destination: event.target.value }))} />
-                </label>
-                <label>
-                  Cost
-                  <input value={bookingDraft.cost} onChange={(event) => setBookingDraft((current) => ({ ...current, cost: event.target.value }))} />
-                </label>
-                <label>
-                  Currency
-                  <select value={bookingDraft.currency} onChange={(event) => setBookingDraft((current) => ({ ...current, currency: event.target.value as BookingDraft["currency"] }))}>
-                    <option value="">None</option>
-                    <option value="USD">USD</option>
-                    <option value="JPY">JPY</option>
-                    <option value="KRW">KRW</option>
-                  </select>
-                </label>
-                <label className="full">
-                  Leave by
-                  <input value={bookingDraft.leaveBy} onChange={(event) => setBookingDraft((current) => ({ ...current, leaveBy: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Notes
-                  <textarea rows={3} value={bookingDraft.notes} onChange={(event) => setBookingDraft((current) => ({ ...current, notes: event.target.value }))} />
-                </label>
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="form-actions">
-                <button className="primary-button" onClick={handleBookingSubmit} type="button">
-                  {editingBookingId ? "Update booking" : "Add booking"}
-                </button>
-                <button className="ghost-button" type="button" onClick={() => { setBookingDraft(emptyBookingDraft()); setEditingBookingId(null); }}>
-                  Clear
-                </button>
+            </details>
+
+            <Panel title="Bookings" subtitle="compact booking rows; click for notes">
+              <div className="table-wrap">
+                <table className="dense-table">
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Start</th>
+                      <th>Route / Property</th>
+                      <th>Provider</th>
+                      <th>Leave by</th>
+                      <th>USD</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.bookings.map((booking) => {
+                      const money = formatUsdWithLocal(
+                        booking.usdCost,
+                        booking.cost,
+                        booking.currency,
+                      );
+                      return (
+                        <ExpandableRow
+                          key={booking.id}
+                          columns={[
+                            booking.kind,
+                            booking.startDateTime.slice(0, 16).replace("T", " "),
+                            booking.kind === "hotel"
+                              ? booking.title
+                              : `${booking.origin} -> ${booking.destination}`,
+                            booking.provider,
+                            booking.leaveBy || "-",
+                            money.label,
+                            "",
+                          ]}
+                          actionCell={
+                            <>
+                              <button
+                                className="small-button"
+                                type="button"
+                                onClick={() => {
+                                  setEditingBookingId(booking.id);
+                                  setBookingDraft({
+                                    kind: booking.kind,
+                                    title: booking.title,
+                                    provider: booking.provider,
+                                    confirmationCode: booking.confirmationCode,
+                                    startDateTime: booking.startDateTime.slice(0, 16),
+                                    endDateTime: booking.endDateTime.slice(0, 16),
+                                    origin: booking.origin,
+                                    destination: booking.destination,
+                                    terminal: booking.terminal,
+                                    address: booking.address,
+                                    cost: booking.cost?.toString() ?? "",
+                                    currency: booking.currency ?? "",
+                                    leaveBy: booking.leaveBy,
+                                    notes: booking.notes,
+                                    sourceUrl: booking.sourceUrl ?? "",
+                                  });
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="small-button danger"
+                                type="button"
+                                onClick={() =>
+                                  runMutation(
+                                    () =>
+                                      mutateData("DELETE", {
+                                        entity: "bookings",
+                                        id: booking.id,
+                                        record: {},
+                                      }),
+                                    "Booking deleted.",
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          }
+                          expandedContent={
+                            <div className="expanded-copy">
+                              <div>Title: {booking.title}</div>
+                              <div>End: {booking.endDateTime}</div>
+                              <div>Confirmation: {booking.confirmationCode || "-"}</div>
+                              <div>Terminal: {booking.terminal || "-"}</div>
+                              <div>Address: {booking.address || "-"}</div>
+                              <div title={money.title}>Local value: {money.title}</div>
+                              <div>Notes: {booking.notes || "-"}</div>
+                            </div>
+                          }
+                        />
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </Panel>
-
-            <div className="card-grid">
-              {data.bookings.map((booking) => {
-                const money = formatUsdWithLocal(
-                  booking.usdCost,
-                  booking.cost,
-                  booking.currency,
-                );
-                return (
-                  <Panel
-                    key={booking.id}
-                    title={booking.title}
-                    subtitle={`${booking.kind} · ${booking.provider}`}
-                  >
-                    <div className="list">
-                      <ListRow label="Window" value={`${booking.startDateTime} → ${booking.endDateTime}`} />
-                      <ListRow label="Route" value={`${booking.origin} → ${booking.destination}`} />
-                      <ListRow label="Leave by" value={booking.leaveBy || "Not set"} />
-                      <ListRow label="Cost" value={money.label} title={money.title} />
-                      <ListRow label="Notes" value={booking.notes} />
-                    </div>
-                    <div className="panel-actions">
-                      <button
-                        className="small-button"
-                        type="button"
-                        onClick={() => {
-                          setEditingBookingId(booking.id);
-                          setBookingDraft({
-                            kind: booking.kind,
-                            title: booking.title,
-                            provider: booking.provider,
-                            confirmationCode: booking.confirmationCode,
-                            startDateTime: booking.startDateTime.slice(0, 16),
-                            endDateTime: booking.endDateTime.slice(0, 16),
-                            origin: booking.origin,
-                            destination: booking.destination,
-                            terminal: booking.terminal,
-                            address: booking.address,
-                            cost: booking.cost?.toString() ?? "",
-                            currency: booking.currency ?? "",
-                            leaveBy: booking.leaveBy,
-                            notes: booking.notes,
-                            sourceUrl: booking.sourceUrl ?? "",
-                          });
-                          setActiveTab("bookings");
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="small-button danger"
-                        type="button"
-                        onClick={() =>
-                          runMutation(
-                            () =>
-                              mutateData("DELETE", {
-                                entity: "bookings",
-                                id: booking.id,
-                                record: {},
-                              }),
-                            "Booking deleted.",
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </Panel>
-                );
-              })}
-            </div>
           </section>
         ) : null}
 
         {activeTab === "guidance" ? (
           <section className="stack">
-            <Panel title="Guidance Editor" subtitle="Station routes, airport timing, and travel notes">
-              <div className="form-grid">
-                <label>
-                  Kind
-                  <select value={guideDraft.kind} onChange={(event) => setGuideDraft((current) => ({ ...current, kind: event.target.value as GuideDraft["kind"] }))}>
-                    <option value="airport">airport</option>
-                    <option value="station">station</option>
-                    <option value="transport">transport</option>
-                    <option value="packing">packing</option>
-                    <option value="budget">budget</option>
-                  </select>
-                </label>
-                <label>
-                  Linked date
-                  <input type="date" value={guideDraft.linkedDate} onChange={(event) => setGuideDraft((current) => ({ ...current, linkedDate: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Title
-                  <input value={guideDraft.title} onChange={(event) => setGuideDraft((current) => ({ ...current, title: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Summary
-                  <input value={guideDraft.summary} onChange={(event) => setGuideDraft((current) => ({ ...current, summary: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Leave by
-                  <input value={guideDraft.leaveBy} onChange={(event) => setGuideDraft((current) => ({ ...current, leaveBy: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Details
-                  <textarea rows={4} value={guideDraft.details} onChange={(event) => setGuideDraft((current) => ({ ...current, details: event.target.value }))} />
-                </label>
-              </div>
-              <div className="form-actions">
-                <button className="primary-button" onClick={handleGuideSubmit} type="button">
-                  {editingGuideId ? "Update guide" : "Add guide"}
-                </button>
-                <button className="ghost-button" type="button" onClick={() => { setGuideDraft(emptyGuideDraft()); setEditingGuideId(null); }}>
-                  Clear
-                </button>
-              </div>
-            </Panel>
-
-            <div className="card-grid">
-              {data.guides.map((guide) => (
-                <Panel
-                  key={guide.id}
-                  title={guide.title}
-                  subtitle={`${guide.kind} · ${guide.linkedDate || "Any day"}`}
-                >
-                  <p className="guide-summary">{guide.summary}</p>
-                  <p>{guide.details}</p>
-                  {guide.leaveBy ? <p className="guide-leave">Leave by: {guide.leaveBy}</p> : null}
-                  <div className="panel-actions">
-                    <button
-                      className="small-button"
-                      type="button"
-                      onClick={() => {
-                        setEditingGuideId(guide.id);
-                        setGuideDraft({
-                          kind: guide.kind,
-                          title: guide.title,
-                          summary: guide.summary,
-                          details: guide.details,
-                          leaveBy: guide.leaveBy,
-                          linkedDate: guide.linkedDate,
-                        });
-                        setActiveTab("guidance");
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="small-button danger"
-                      type="button"
-                      onClick={() =>
-                        runMutation(
-                          () =>
-                            mutateData("DELETE", {
-                              entity: "guides",
-                              id: guide.id,
-                              record: {},
-                            }),
-                          "Guide deleted.",
-                        )
+            <div className="section-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setEditingGuideId(null);
+                  setGuideDraft(emptyGuideDraft());
+                }}
+              >
+                Add new guidance item
+              </button>
+            </div>
+            <details className="editor-panel">
+              <summary>Guidance editor</summary>
+              <div className="editor-body">
+                <div className="form-grid">
+                  <label>
+                    Kind
+                    <select
+                      value={guideDraft.kind}
+                      onChange={(event) =>
+                        setGuideDraft((current) => ({
+                          ...current,
+                          kind: event.target.value as GuideDraft["kind"],
+                        }))
                       }
                     >
-                      Delete
-                    </button>
-                  </div>
-                </Panel>
-              ))}
-            </div>
+                      <option value="airport">airport</option>
+                      <option value="station">station</option>
+                      <option value="transport">transport</option>
+                      <option value="packing">packing</option>
+                      <option value="budget">budget</option>
+                    </select>
+                  </label>
+                  <label>
+                    Date
+                    <input
+                      type="date"
+                      value={guideDraft.linkedDate}
+                      onChange={(event) =>
+                        setGuideDraft((current) => ({
+                          ...current,
+                          linkedDate: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="full">
+                    Title
+                    <input
+                      value={guideDraft.title}
+                      onChange={(event) =>
+                        setGuideDraft((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="full">
+                    Details
+                    <textarea
+                      rows={2}
+                      value={guideDraft.details}
+                      onChange={(event) =>
+                        setGuideDraft((current) => ({
+                          ...current,
+                          details: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" onClick={handleGuideSubmit} type="button">
+                    {editingGuideId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setGuideDraft(emptyGuideDraft());
+                      setEditingGuideId(null);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </details>
+
+            <Panel title="Guidance Sheet" subtitle="minimal rows; expand for full instructions">
+              <div className="table-wrap">
+                <table className="dense-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Kind</th>
+                      <th>Title</th>
+                      <th>Leave by</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.guides.map((guide) => (
+                      <ExpandableRow
+                        key={guide.id}
+                        columns={[
+                          guide.linkedDate || "-",
+                          guide.kind,
+                          guide.title,
+                          guide.leaveBy || "-",
+                          "",
+                        ]}
+                        actionCell={
+                          <>
+                            <button
+                              className="small-button"
+                              type="button"
+                              onClick={() => {
+                                setEditingGuideId(guide.id);
+                                setGuideDraft({
+                                  kind: guide.kind,
+                                  title: guide.title,
+                                  summary: guide.summary,
+                                  details: guide.details,
+                                  leaveBy: guide.leaveBy,
+                                  linkedDate: guide.linkedDate,
+                                });
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="small-button danger"
+                              type="button"
+                              onClick={() =>
+                                runMutation(
+                                  () =>
+                                    mutateData("DELETE", {
+                                      entity: "guides",
+                                      id: guide.id,
+                                      record: {},
+                                    }),
+                                  "Guide deleted.",
+                                )
+                              }
+                            >
+                              Delete
+                            </button>
+                          </>
+                        }
+                        expandedContent={
+                          <div className="expanded-copy">
+                            <div>Summary: {guide.summary || "-"}</div>
+                            <div>Details: {guide.details || "-"}</div>
+                          </div>
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
           </section>
         ) : null}
 
         {activeTab === "checklist" ? (
           <section className="stack">
-            <Panel title="Checklist Editor" subtitle="Prep items, notes, and cost estimates">
-              <div className="form-grid">
-                <label>
-                  Category
-                  <input value={checklistDraft.category} onChange={(event) => setChecklistDraft((current) => ({ ...current, category: event.target.value }))} />
-                </label>
-                <label>
-                  Status
-                  <select value={checklistDraft.status} onChange={(event) => setChecklistDraft((current) => ({ ...current, status: event.target.value as ChecklistDraft["status"] }))}>
-                    <option value="todo">todo</option>
-                    <option value="done">done</option>
-                  </select>
-                </label>
-                <label className="full">
-                  Label
-                  <input value={checklistDraft.label} onChange={(event) => setChecklistDraft((current) => ({ ...current, label: event.target.value }))} />
-                </label>
-                <label className="full">
-                  Notes
-                  <textarea rows={3} value={checklistDraft.notes} onChange={(event) => setChecklistDraft((current) => ({ ...current, notes: event.target.value }))} />
-                </label>
-                <label>
-                  Estimated cost
-                  <input value={checklistDraft.estimatedCost} onChange={(event) => setChecklistDraft((current) => ({ ...current, estimatedCost: event.target.value }))} />
-                </label>
-                <label>
-                  Currency
-                  <select value={checklistDraft.currency} onChange={(event) => setChecklistDraft((current) => ({ ...current, currency: event.target.value as ChecklistDraft["currency"] }))}>
-                    <option value="">None</option>
-                    <option value="USD">USD</option>
-                    <option value="JPY">JPY</option>
-                    <option value="KRW">KRW</option>
-                  </select>
-                </label>
+            <div className="section-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  setEditingChecklistId(null);
+                  setChecklistDraft(emptyChecklistDraft());
+                }}
+              >
+                Add new checklist item
+              </button>
+            </div>
+            <details className="editor-panel">
+              <summary>Checklist editor</summary>
+              <div className="editor-body">
+                <div className="form-grid">
+                  <label>
+                    Category
+                    <input
+                      value={checklistDraft.category}
+                      onChange={(event) =>
+                        setChecklistDraft((current) => ({
+                          ...current,
+                          category: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Status
+                    <select
+                      value={checklistDraft.status}
+                      onChange={(event) =>
+                        setChecklistDraft((current) => ({
+                          ...current,
+                          status: event.target.value as ChecklistDraft["status"],
+                        }))
+                      }
+                    >
+                      <option value="todo">todo</option>
+                      <option value="done">done</option>
+                    </select>
+                  </label>
+                  <label className="full">
+                    Label
+                    <input
+                      value={checklistDraft.label}
+                      onChange={(event) =>
+                        setChecklistDraft((current) => ({
+                          ...current,
+                          label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="full">
+                    Notes
+                    <textarea
+                      rows={2}
+                      value={checklistDraft.notes}
+                      onChange={(event) =>
+                        setChecklistDraft((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" onClick={handleChecklistSubmit} type="button">
+                    {editingChecklistId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setChecklistDraft(emptyChecklistDraft());
+                      setEditingChecklistId(null);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="form-actions">
-                <button className="primary-button" onClick={handleChecklistSubmit} type="button">
-                  {editingChecklistId ? "Update checklist item" : "Add checklist item"}
-                </button>
-                <button className="ghost-button" type="button" onClick={() => { setChecklistDraft(emptyChecklistDraft()); setEditingChecklistId(null); }}>
-                  Clear
-                </button>
+            </details>
+
+            <Panel title="Checklist" subtitle="dense prep sheet">
+              <div className="table-wrap">
+                <table className="dense-table">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Category</th>
+                      <th>Item</th>
+                      <th>USD Est.</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.checklist.map((item) => {
+                      const money = formatUsdWithLocal(
+                        item.usdEstimatedCost,
+                        item.estimatedCost,
+                        item.currency,
+                      );
+                      return (
+                        <ExpandableRow
+                          key={item.id}
+                          columns={[
+                            item.status,
+                            item.category,
+                            item.label,
+                            item.estimatedCost !== null ? money.label : "-",
+                            "",
+                          ]}
+                          actionCell={
+                            <>
+                              <button
+                                className="small-button"
+                                type="button"
+                                onClick={() => {
+                                  setEditingChecklistId(item.id);
+                                  setChecklistDraft({
+                                    category: item.category,
+                                    label: item.label,
+                                    notes: item.notes,
+                                    status: item.status,
+                                    estimatedCost:
+                                      item.estimatedCost?.toString() ?? "",
+                                    currency: item.currency ?? "",
+                                  });
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="small-button danger"
+                                type="button"
+                                onClick={() =>
+                                  runMutation(
+                                    () =>
+                                      mutateData("DELETE", {
+                                        entity: "checklist",
+                                        id: item.id,
+                                        record: {},
+                                      }),
+                                    "Checklist item deleted.",
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          }
+                          expandedContent={
+                            <div className="expanded-copy">
+                              <div title={money.title}>Local value: {money.title}</div>
+                              <div>Notes: {item.notes || "-"}</div>
+                            </div>
+                          }
+                        />
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </Panel>
-
-            <div className="card-grid">
-              {data.checklist.map((item) => {
-                const money = formatUsdWithLocal(
-                  item.usdEstimatedCost,
-                  item.estimatedCost,
-                  item.currency,
-                );
-                return (
-                  <Panel key={item.id} title={item.label} subtitle={`${item.category} · ${item.status}`}>
-                    <p>{item.notes}</p>
-                    {item.estimatedCost !== null ? (
-                      <p className="guide-leave" title={money.title}>
-                        Est. cost: {money.label}
-                      </p>
-                    ) : null}
-                    <div className="panel-actions">
-                      <button
-                        className="small-button"
-                        type="button"
-                        onClick={() => {
-                          setEditingChecklistId(item.id);
-                          setChecklistDraft({
-                            category: item.category,
-                            label: item.label,
-                            notes: item.notes,
-                            status: item.status,
-                            estimatedCost: item.estimatedCost?.toString() ?? "",
-                            currency: item.currency ?? "",
-                          });
-                          setActiveTab("checklist");
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="small-button danger"
-                        type="button"
-                        onClick={() =>
-                          runMutation(
-                            () =>
-                              mutateData("DELETE", {
-                                entity: "checklist",
-                                id: item.id,
-                                record: {},
-                              }),
-                            "Checklist item deleted.",
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </Panel>
-                );
-              })}
-            </div>
           </section>
         ) : null}
       </main>
@@ -1644,19 +1872,154 @@ function Panel({
   );
 }
 
-function ListRow({
-  label,
-  value,
-  title,
+function CompactTable({
+  headers,
+  rows,
 }: {
-  label: string;
-  value: string;
-  title?: string;
+  headers: string[];
+  rows: string[][];
 }) {
   return (
-    <div className="list-row" title={title}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="table-wrap">
+      <table className="dense-table">
+        <thead>
+          <tr>
+            {headers.map((header) => (
+              <th key={header}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={`${rowIndex}-${row.join("-")}`}>
+              {row.map((cell, cellIndex) => (
+                <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ExpandableRow({
+  columns,
+  expandedContent,
+  actionCell,
+}: {
+  columns: string[];
+  expandedContent: React.ReactNode;
+  actionCell?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const actionIndex = columns.length - 1;
+
+  return (
+    <>
+      <tr
+        className={open ? "row-open" : "row-closed"}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {columns.map((column, index) => (
+          <td key={`${index}-${column}`}>
+            {index === actionIndex && actionCell ? (
+              <div
+                className="actions-cell"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {actionCell}
+              </div>
+            ) : (
+              column
+            )}
+          </td>
+        ))}
+      </tr>
+      {open ? (
+        <tr className="expanded-row">
+          <td colSpan={columns.length}>{expandedContent}</td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
+function ExpensePieChart({
+  items,
+}: {
+  items: Array<{ division: string; total: number }>;
+}) {
+  const colors = [
+    "#0d6f6f",
+    "#c48a26",
+    "#4f6d7a",
+    "#c26053",
+    "#6f8f3e",
+    "#7f6db0",
+    "#d0934d",
+    "#5384a8",
+  ];
+
+  const total = items.reduce((sum, item) => sum + item.total, 0);
+
+  if (!items.length || total <= 0) {
+    return <div className="chart-empty">No expense data yet.</div>;
+  }
+
+  const segments = items.map((item, index) => {
+    const value = item.total / total;
+    const start =
+      items
+        .slice(0, index)
+        .reduce((sum, current) => sum + current.total / total, 0);
+    return {
+      ...item,
+      start,
+      end: start + value,
+      color: colors[index % colors.length],
+      percent: value * 100,
+    };
+  });
+
+  return (
+    <div className="pie-layout">
+      <svg viewBox="0 0 42 42" className="pie-chart" aria-label="Expense types pie chart">
+        <circle cx="21" cy="21" r="15.915" fill="#f4f0ea" />
+        {segments.map((segment) => (
+          <circle
+            key={segment.division}
+            cx="21"
+            cy="21"
+            r="15.915"
+            fill="transparent"
+            stroke={segment.color}
+            strokeWidth="8"
+            strokeDasharray={`${segment.percent} ${100 - segment.percent}`}
+            strokeDashoffset={`${25 - segment.start * 100}`}
+          />
+        ))}
+        <circle cx="21" cy="21" r="9.5" fill="#fffdf8" />
+        <text x="21" y="20" textAnchor="middle" className="pie-center-label">
+          Total
+        </text>
+        <text x="21" y="24.4" textAnchor="middle" className="pie-center-value">
+          {Math.round(total)}
+        </text>
+      </svg>
+
+      <div className="pie-legend">
+        {segments.map((segment) => (
+          <div key={segment.division} className="legend-row">
+            <span
+              className="legend-swatch"
+              style={{ backgroundColor: segment.color }}
+            />
+            <span>{segment.division}</span>
+            <strong>{formatMoney(segment.total, "USD")}</strong>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
