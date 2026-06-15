@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useDeferredValue, useState, useTransition } from "react";
 
 import type { TripAppData } from "@/lib/trip-types";
@@ -605,11 +606,16 @@ export function TripCompanionApp({
           <p className="eyebrow">June 15 to July 13, 2026 | Japan + Korea</p>
           <h1>Trip Companion</h1>
         </div>
-        <div className="header-meta">
-          <span>{data.tripDays.length} days</span>
-          <span>{data.activities.length} activities</span>
-          <span>{data.expenses.length} expense rows</span>
-          <span>{data.persistenceMode === "database" ? "live db" : "seed only"}</span>
+        <div className="header-actions">
+          <Link href="/activity-view" className="ghost-button header-link-button">
+            activitiy view
+          </Link>
+          <div className="header-meta">
+            <span>{data.tripDays.length} days</span>
+            <span>{data.activities.length} activities</span>
+            <span>{data.expenses.length} expense rows</span>
+            <span>{data.persistenceMode === "database" ? "live db" : "seed only"}</span>
+          </div>
         </div>
       </header>
 

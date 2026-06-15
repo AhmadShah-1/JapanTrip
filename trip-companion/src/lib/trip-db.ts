@@ -132,22 +132,14 @@ async function initializeSchema(): Promise<void> {
   }
 }
 
-async function countRows(table: string): Promise<number> {
-  if (!sql) return 0;
-  const query = `SELECT COUNT(*)::int AS count FROM ${table}`;
-  const rows = (await sql.query(query)) as Array<{ count: number }>;
-  return rows[0]?.count ?? 0;
-}
-
 async function seedTable(seedData: SeedData): Promise<void> {
   if (!sql) return;
-  const hasDays = await countRows("trip_days");
-  if (hasDays > 0) return;
 
   for (const day of seedData.tripDays) {
     await sql`
       INSERT INTO trip_days (id, date_text, city, title, subtitle, hotel, notes)
       VALUES (${day.id}, ${day.date}, ${day.city}, ${day.title}, ${day.subtitle}, ${day.hotel}, ${day.notes})
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 
@@ -164,6 +156,7 @@ async function seedTable(seedData: SeedData): Promise<void> {
         ${activity.currency}, ${activity.usdEstimatedCost}, ${activity.usdActualCost},
         ${activity.sourceType}, ${activity.sourceUrl}, ${activity.bookingNeeded}, ${activity.priority}
       )
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 
@@ -178,6 +171,7 @@ async function seedTable(seedData: SeedData): Promise<void> {
         ${expense.notes}, ${expense.date}, ${expense.status}, ${expense.sourceType},
         ${expense.sourceUrl}
       )
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 
@@ -194,6 +188,7 @@ async function seedTable(seedData: SeedData): Promise<void> {
         ${booking.cost}, ${booking.currency}, ${booking.usdCost}, ${booking.leaveBy},
         ${booking.notes}, ${booking.sourceType}, ${booking.sourceUrl}
       )
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 
@@ -205,6 +200,7 @@ async function seedTable(seedData: SeedData): Promise<void> {
         ${guide.id}, ${guide.kind}, ${guide.title}, ${guide.summary},
         ${guide.details}, ${guide.leaveBy}, ${guide.linkedDate}, ${guide.sourceType}
       )
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 
@@ -216,6 +212,7 @@ async function seedTable(seedData: SeedData): Promise<void> {
         ${item.id}, ${item.category}, ${item.label}, ${item.notes}, ${item.status},
         ${item.estimatedCost}, ${item.currency}, ${item.usdEstimatedCost}
       )
+      ON CONFLICT (id) DO NOTHING
     `;
   }
 

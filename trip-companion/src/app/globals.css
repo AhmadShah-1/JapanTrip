@@ -88,6 +88,19 @@ button {
   gap: 0.3rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.header-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 .header-meta span,
 .status-pill {
   border: 1px solid var(--line);
@@ -164,6 +177,20 @@ button {
 .stack {
   display: grid;
   gap: 0.45rem;
+}
+
+.activity-view-page {
+  width: 100vw;
+  min-height: 100vh;
+  background: #f5f1ea;
+}
+
+.activity-view-frame {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  border: 0;
+  background: white;
 }
 
 .metric-grid,
@@ -443,6 +470,12 @@ th {
   .status-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .metric-grid,
